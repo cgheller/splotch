@@ -9,11 +9,13 @@
 
     Klaus Dolag:      kdolag <at> mpa-garching<dot>mpg<dot>de
 
-    Claudio Gheller:  c<dot>gheller <at> cineca<dot>it
+    Claudio Gheller:  cgheller@cscs.ch
 
+    Marzia Rivi:      rivi@physics.ox.ac.uk
+    
+    Tim Dykes         timothy.dykes@myport.ac.uk
+    
     Zhefan.Jin:       zhefan<dot>jin <at> gmail<dot>com
-
-    Marzia Rivi:      m<dot>rivi <at> cineca<dot>it
 
 Splotch is written in the C++ language. To install it you have just to
 1) unpack the tar.gz
