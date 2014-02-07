@@ -1,0 +1,124 @@
+FOR EACH COMPONENT
+  - allocate x,y,z (and other) arrays with maximum size read from param file
+  - read binary images with colors and intensity using ReadImages function
+  - generate particle distribution calling GaussRFunc with proper OPTION 
+  - assign colors and intensities to the generated particles (explicitely or calling CalculateColours)
+  - assign hsml (constant or adaptive - i.e. function of the intensity)
+  - define point vectors of proper size to store generated data
+  - write point vectors in the corresponding block of the GADGET file
+ENDFOR
+
+GENERAL NOTES:
+
+1. coordinate systems:
+  -- [-minval : maxval] centered on the galaxy, depends on the model:
+  ---- TIRIFIC model: arcsec, centered on the galaxy
+  ---- TIRIFIC + DICE models: arcsec, centered on the galaxy
+
+2. generated particle types, GADGET format (output file)
+  0 = gas
+  1 = bulge
+  2 = disk
+  3 = globular clusters
+  4 = Optical stars
+  5 = UV stars
+
+3. DICE particle file
+  0 = gas
+  1 = halo
+  2 = stars (optical/uv...)
+  3 = bulge
+  
+PARAMETERS:
+
+CalculateColours.cxx
+  <float>("Brightness"+ComponentsName,1.0); increase particle intensity of a given multiplicative factor
+  <float>("PixelToArcsec"+ComponentsName,-1.0); Conversion factor between pixel size and TiRiFiC (radial) units (one pixel is x arcsec)
+
+Galaxy.cxx
+  <string>("OutFile","demo"); generated particles file name: GADGET TYPE 2 FORMAT 
+  <long>("Do"+ComponentsName[itype],0); component suffixes:
+        ComponentsName[0] = "Gas";
+        ComponentsName[1] = "Bulge";
+        ComponentsName[2] = "Disk";
+        ComponentsName[3] = "GCluster";
+        ComponentsName[4] = "Stars";
+        ComponentsName[5] = "BHs";
+        this value sets the corresponding fuction call (OPTION) in GaussRFunc
+  <long>("N"+ComponentsName[itype],0); maximum number of particles for that component
+  <string>(ComponentsName[itype]+"FileRGB","NONE"); clean image for RGB (binary 3 bytes components file)
+  <string>(ComponentsName[itype]+"FileMask","NONE"); clean image for intensity (binary 1 byte components file)
+  <long>(ComponentsName[itype]+"xres",1000); x resolution of the image (each species can have a different resolution)
+  <long>(ComponentsName[itype]+"yres",1000); y resolution of the image
+  <long>("InFileType"+ComponentsName[itype],1); at the moment only 1 (binary) is supported (calling ReadImages)
+  <long>("Nmaxper"+ComponentsName[itype],0); max number of particles per globular cluster
+  <float>("Brightness"+ComponentsName[itype],1.0); increase particle intensity of a given multiplicative factor
+  <float>("hsml"+ComponentsName[itype],0.001); hsml value (constant for each component)
+  <float>("Adaptivehsml"+ComponentsName[itype],0.0); if not 0.0, assign hsml as: hsml/(1.0+Adaptivehsml*I);
+  <float>("Red"+ComponentsName[itype],1.0); constant color of a component
+  <float>("Green"+ComponentsName[itype],1.0);
+  <float>("Blue"+ComponentsName[itype],1.0);
+
+
+ReadImages.cxx
+  <long>("Nskip",1); keeps one pixel every nskip
+
+GaussRFunc.cxx
+
+OPTION 1: creates an ellipsoid
+  <float>("Sigmax"+ComponentName,0); x axis (gaussian points distribution) [0-realnumber]
+  <float>("Sigmay"+ComponentName,0); y axis
+  <float>("Sigmaz"+ComponentName,0); z axis
+  <int>("Rotate"+ComponentName,0); 0 axes parallel to cartesian axes; 1 follows TIRIFIC model
+  <float>("InternToArcsec"+ComponentName,1.0); conversion from sigma unit to arcsec
+  <string>("TirificModel"+ComponentName); TIRIFIC model file name
+
+OPTION 2: not implemented
+
+OPTION 3: creates a clumpy disk of stars (face-on disk galaxies). One seed particle per non-black pixel generated
+  <float>("Sigmaz"+ComponentName,0.01); thickness of the disk at the galaxy center - code coordinates [0-1] - gaussian distribution
+  <float>("Sigmag"+ComponentName,0.001); dispersion of point cloud around a "seed point" - code coordinates [0-1]
+  long n_per_pixel = params.find<float>("NperGroup"+ComponentName,1); number of points around each seed
+
+OPTION 4: create generic 3D gas distribution
+  <float>("Sigmaz"+ComponentName,0); thickness FRACTION in the third dimension - fraction of thickness read from image times the typical size sqrt(x^2+y^2) [0-1]
+  <float>("Sigmag"+ComponentName,0.1); dispersion of point cloud around a "seed point" - fraction of the third dimension thickness calculated as above [0-1]
+  long npergroup = params.find<long>("NperGroup"+ComponentName,0); number of points around each seed
+  long rx = params.find<long>("Scaledxres"+ComponentName,1); rescaled x resolution to smooth the image - pixels
+  long ry = params.find<long>("Scaledyres"+ComponentName,1); rescaled y resolution to smooth the image - pixels
+
+OPTION 5: stars distribution in irregular galaxies
+  <float>("Sigmaz"+ComponentName,0.8); thickness in the third dimension - fraction of the minimum size in the x and y directions [0-1]
+  <long>("NperGroup"+ComponentName,0); number of clustered points around each seed
+  <float>("NdiffuseFactor"+ComponentName,0); number of diffused point per seed
+  <float>("Sigmag"+ComponentName,0.1); dispersion of point clouds around the corresponding seed point - pixels
+  <float>("Sigmad"+ComponentName,1); Sigmad*Sigmag is the dispersion of diffused points
+
+OPTION 6: gas distribution using the tirific model
+  <string>("TirificModel"+ComponentName).c_str()); file containing parameters of the TiRiFiC model 
+  <float>("PixelToArcsec"+ComponentName,1.0); Conversion factor between pixel size and TiRiFiC (radial) units (one pixel is x arcsec)
+  <float>("TirificPartReduce"+ComponentName,0.75); Number of samples to model the galaxy (should be less than the number of particles)
+  <float>("TirificExtendDisk"+ComponentName,1.0); Parameter related to the thikness of the disk [0-1]: PROBABLY REMOVE
+  <float>("RmaxMask"+ComponentName,200.0); maximunm radius to be sampled in arcsecond
+  <float>("NperPixel"+ComponentName,1); number of points around each seed
+  <float>("Sigmaz"+ComponentName,0); if NOT provided by the Tirific file (if provided, =0.0), set thickness in the third dimension - PIXELS
+  <float>("Cutoff"+ComponentName,0.0); Intensity cutoff (pixels below the cutoff areconsidered as black) - [0-255]
+
+OPTION 7: stars/gas distribution using the tirific model using DICE generated particles
+  <string>("TirificModel"+ComponentName).c_str()); file containing parameters of the TiRiFiC model 
+  <float>("PixelToArcsec"+ComponentName,1.0); Conversion factor between pixel size and TiRiFiC (radial) units (one pixel is x arcsec)
+  <float>("InternToArcsec"+ComponentName,1.0); Conversion factor between parsec and TiRiFiC (radial) units (one parsec is x arcsec)
+  <string>("DiceModel"+ComponentName).c_str(), "r"); file containing DICE particles
+  <int>("DiceComponent"+ComponentName); component in the DICE file ito process - [0-5]
+  <float>("Cutoff"+ComponentName,0.0); minimum value of intensity to accept the particle (remove dark particles)
+
+OPTION 8: spherical point distribution generated by the DICE model
+  <float>("InternToArcsec"+ComponentName,1.0); Conversion factor between pixel size and TiRiFiC (radial) units (one pixel is x arcsec)
+  <string>("DiceModel"+ComponentName).c_str(), "r"); file containing DICE particles
+   int dice_comp = params.find<int>("DiceComponent"+ComponentName); component in the DICE file ito process - [0-5]
+
+GlobularCluster.cxx
+  <float>("Sigmag"+ComponentName,0); dispersion of point cloud around a "seed point" - code coordinates [0-1]
+  <float>("Sigmax"+ComponentName,0); x seeds distribution (gaussian points distribution) [0-1]
+  <float>("Sigmay"+ComponentName,0); y seeds distribution (gaussian points distribution) [0-1]
+  <float>("Sigmaz"+ComponentName,0); z seeds distribution (gaussian points distribution) [0-1]
